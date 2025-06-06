@@ -5,7 +5,7 @@ let playing = false;
 
 let noiseOffset = 0;
 
-// 🎨 Custom note color mapping
+//  Custom note color mapping
 const customNoteColors = {
   "C4": "#214F4B",  //grün-grau  
   "D4": "#909CC2", //bleuliches grau 
@@ -22,7 +22,7 @@ function preload() {
 }
 
 function setup() {
-  createCanvas(800, 600);
+  createCanvas(windowWidth, windowHeight);
   background(0);
   fft = new p5.FFT();
   fft.setInput(song);
@@ -89,6 +89,19 @@ function mousePressed() {
     song.pause();
     playing = false;
   }
+}
+
+function keyPressed() {
+  if (key === ' ') {
+    if (!song.isPlaying()) {
+      background(0);
+      song.play();
+      playing = true;
+    } else {
+      song.pause();
+      playing = false;
+    }
+  }  
 }
 
 // --- Helpers ---
