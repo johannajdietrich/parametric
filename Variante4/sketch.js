@@ -1,14 +1,10 @@
-let fft;
 let mic;
+let fftFull;    // For full spectrum (bass)
+let fftMelody;  // For low-res (melody)
+
 let notes = {};
-
-let noiseOffset = 0;
-let floatPhase = 0;
-let floatOffsetX = 0;
-let floatOffsetY = 0;
-let bassShake = 1;
-
 let baseNoteColors = {};
+let noiseOffset = 0;
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
@@ -17,36 +13,39 @@ function setup() {
   noFill();
 
   mic = new p5.AudioIn();
-  mic.start();        
+  mic.start();
 
-  fft = new p5.FFT();
-  fft.setInput(mic);
+  // Two different FFTs
+  fftFull = new p5.FFT(0.8, 1024);  // High resolution
+  fftFull.setInput(mic);
 
+  fftMelody = new p5.FFT(0.8, 128);  // Low resolution
+  fftMelody.setInput(mic);
+
+  // Base note colors
   baseNoteColors = {
-    "C": color("#E69F00"),    
-    "C#": color("#56B4E9"),   
-    "D": color("#009E73"),   
-    "D#": color("#F0E442"),  
-    "E": color("#0072B2"),   
-    "F": color("#D55E00"),    
-    "F#": color("#CC79A7"),  
-    "G": color("#999999"),    
-    "G#": color("#E69F00"),  
+    "C": color("#E69F00"),
+    "C#": color("#56B4E9"),
+    "D": color("#009E73"),
+    "D#": color("#F0E442"),
+    "E": color("#0072B2"),
+    "F": color("#D55E00"),
+    "F#": color("#CC79A7"),
+    "G": color("#999999"),
+    "G#": color("#E69F00"),
     "A": color("#56B4E9"),
     "A#": color("#009E73"),
     "B": color("#F0E442")
   };
-  
+
+  // Assign color to each note based on octave
   for (let midi = 21; midi <= 108; midi++) {
     let name = midiToNoteName(midi);
     let note = name.slice(0, -1);
     let octave = parseInt(name.slice(-1));
-
-    let baseColor = baseNoteColors[note];
+    let baseColor = baseNoteColors[note] || color(random(255), random(255), random(255));
     let brightness = map(octave, 1, 8, 0.3, 1.2);
-    let c = baseColor ? baseColor : color(random(255), random(255), random(255));
-    c = lerpColor(color(0), c, brightness);
-
+    let c = lerpColor(color(0), baseColor, brightness);
     notes[name] = { color: c, midi: midi };
   }
 }
@@ -54,50 +53,33 @@ function setup() {
 function draw() {
   if (!mic.enabled) return;
 
-  background(0, 20); // trailing effect
+  background(0, 20);
 
-  // Frequency analysis
-  let fullSpectrum = fft.analyze();       // high-res for bass
-  let lowResSpectrum = fft.analyze(32);   // low-res for note bursts
-  let bassEnergy = fft.getEnergy("bass");
-  let wave = fft.waveform();
+  // === BASS: Use full spectrum ===
+  let fullSpectrum = fftFull.analyze();
+  let bassEnergy = fftFull.getEnergy("bass");
+  let radius = map(bassEnergy, 0, 255, 150, 300);
 
-  // Circular waveform visualization
   push();
   translate(width / 2, height / 2);
+  noFill();
   stroke(100, 150, 255, 180);
-  strokeWeight(2);
+  strokeWeight(3);
   drawingContext.shadowBlur = 25;
   drawingContext.shadowColor = color(100, 150, 255);
-
-  beginShape();
-  for (let i = 0; i < wave.length; i++) {
-    let angle = map(i, 0, wave.length, 0, TWO_PI);
-    let radius = 200 + wave[i] * 150;
-    let x = radius * cos(angle);
-    let y = radius * sin(angle);
-    vertex(x, y);
-  }
-  endShape(CLOSE);
-
+  ellipse(0, 0, radius * 2, radius * 2);
   drawingContext.shadowBlur = 0;
   pop();
 
-  // Bass-driven floating shake
-  bassShake = map(bassEnergy, 0, 255, 0, 10);
-  floatPhase += 0.01;
-  floatOffsetX = sin(floatPhase) * bassShake * 2;
-  floatOffsetY = cos(floatPhase * 0.75) * bassShake * 2;
+  // === MELODY: Use 32-band low-res spectrum ===
+  let melodySpectrum = fftMelody.analyze();
 
-  // Floating note burst visuals
   push();
-  translate(floatOffsetX, floatOffsetY);
+  for (let i = 0; i < melodySpectrum.length; i++) {
+    let freq = (i * sampleRate()) / (2 * melodySpectrum.length);
+    let energy = melodySpectrum[i];
 
-  for (let i = 0; i < lowResSpectrum.length; i++) {
-    let freq = (i * sampleRate()) / (2 * lowResSpectrum.length);
-    let energy = lowResSpectrum[i];
-
-    if (energy > 50) {
+    if (energy > 60) {
       let midi = freqToMidi(freq);
       let name = midiToNoteName(midi);
 
@@ -118,12 +100,10 @@ function draw() {
       }
     }
   }
-
   pop();
 
   noiseOffset += 0.01;
 }
-
 
 function freqToMidi(frequency) {
   return Math.round(69 + 12 * Math.log2(frequency / 440));
