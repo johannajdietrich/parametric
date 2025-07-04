@@ -46,7 +46,7 @@ function draw() {
   rect(0, 0, width, height);
 
   fft.analyze(); // use default resolution (1024)
-  let spectrum = fft.analyze();
+  let spectrum = fft.analyze(32);
   noiseOffset += 0.01;
 
   // --- BASS Detection ---
@@ -64,7 +64,7 @@ function draw() {
     endShape();
   }
 
-  // --- 🎹 Melody / Note Visualization ---
+  // --- Melody / Note Visualization ---
   for (let i = 0; i < spectrum.length; i++) {
     let freq = (i * sampleRate()) / (2 * spectrum.length);
     let energy = spectrum[i];
